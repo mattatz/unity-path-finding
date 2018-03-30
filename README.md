@@ -7,6 +7,7 @@ Shortest path finding with Dijkstra's algorithm for Unity.
 
 ## Usage (2D grid nodes example)
 
+```cs
 var nodes = new List<Node>();
 var edges = new List<Edge>();
 
@@ -14,6 +15,7 @@ var edges = new List<Edge>();
 int width = 10, height = 10;
 
 // create nodes on grid
+
 for(int y = 0; y < height; y++)
 {
     for(int x = 0; x < width; x++)
@@ -70,6 +72,7 @@ while(current != Path.SOURCE && path.Route[current] != Path.SOURCE) {
     // path.Route has previous node index from next node
     current = path.Route[current];
 }
+```
 
 ## Sources
 
