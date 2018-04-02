@@ -19,7 +19,7 @@ namespace PathFinding.Demo
 
         protected const int source = 0;
         protected Graph graph;
-        protected Path path;
+        protected Route route;
 
         protected GUIStyle style = new GUIStyle();
 
@@ -71,8 +71,7 @@ namespace PathFinding.Demo
             }
 
             graph = new Graph(nodes, edges);
-            path = Dijkstra.Find(graph, source % (graph.Nodes.Count));
-
+            route = graph.Find(source % (graph.Nodes.Count));
         }
 
         protected void Update()
@@ -118,13 +117,13 @@ namespace PathFinding.Demo
             });
 
             Gizmos.color = Color.green;
-            var current = destination;
-            while(current != Path.SOURCE && path.Route[current] != Path.SOURCE) {
-                var from = graph.Nodes[current];
-                var to = graph.Nodes[path.Route[current]];
-                Gizmos.DrawLine((from as Node3D).Position, (to as Node3D).Position);
 
-                current = path.Route[current];
+            var nodes = route.Traverse(graph, destination);
+            for(int i = 0, n = nodes.Count - 1; i < n; i++)
+            {
+                var from = nodes[i];
+                var to = nodes[i + 1];
+                Gizmos.DrawLine((from as Node3D).Position, (to as Node3D).Position);
             }
 
         }

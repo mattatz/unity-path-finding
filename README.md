@@ -55,23 +55,24 @@ for(int y = 0; y < height; y++)
 // create graph
 var graph = new Graph(nodes, edges);
 
-// build a Path with shortest path finding from source
+// build a Route with shortest path finding from source
 int source = 0; // source node index
-var path = Dijkstra.Find(graph, source);
+Route route = graph.Find(source);
 
 // traverse a route from source to destination
 int destination = 84; // destination node index
-int current = destination;
-while(current != Path.SOURCE && path.Route[current] != Path.SOURCE) {
-    var from = graph.Nodes[current];
-    var to = graph.Nodes[path.Route[current]];
+
+// traverse nodes from destination to source
+List<Node> nodes = route.Traverse(graph, destination);
+for(int i = 0, n = nodes.Count - 1; i < n; i++)
+{
+    var from = nodes[i];
+    var to = nodes[i + 1];
 
     // draw line between from and to nodes
     Gizmos.DrawLine((from as Node3D).Position, (to as Node3D).Position);
-
-    // path.Route has previous node index from next node
-    current = path.Route[current];
 }
+
 ```
 
 ## Sources
