@@ -12,22 +12,15 @@ using Random = UnityEngine.Random;
 namespace PathFinding.Demo
 {
 
-    public class Demo : MonoBehaviour {
+    public class Permutation : MonoBehaviour {
 
         [SerializeField] protected int width = 10, height = 10;
-        [SerializeField] protected int destination = 84;
 
-        protected const int source = 0;
         protected Graph graph;
-        protected Path path;
-
-        protected GUIStyle style = new GUIStyle();
+        protected List<Path> routes;
 
         protected void Start()
         {
-            style.alignment = TextAnchor.MiddleCenter;
-            style.normal.textColor = Color.white;
-
             var nodes = new List<Node>();
             var edges = new List<Edge>();
 
@@ -71,60 +64,15 @@ namespace PathFinding.Demo
             }
 
             graph = new Graph(nodes, edges);
-            path = graph.Find(source % (graph.Nodes.Count));
+            routes = graph.Permutation();
         }
 
         protected void Update()
         {
-            if(Time.frameCount % 2 == 0)
-            {
-                destination++;
-            }
         }
 
         protected void OnDrawGizmos()
         {
-            if (graph == null) return;
-
-            Gizmos.matrix = transform.localToWorldMatrix;
-
-            #if UNITY_EDITOR
-            Handles.matrix = transform.localToWorldMatrix;
-            #endif
-
-            destination = Mathf.Max(0, destination % (graph.Nodes.Count));
-
-            for(int i = 0, n = graph.Nodes.Count; i < n; i++)
-            {
-                var node = graph.Nodes[i];
-                Gizmos.color = ((i == source) || (i == destination)) ? Color.white : Color.black;
-                Gizmos.DrawSphere(node.Position, 0.1f);
-            }
-
-            Gizmos.color = Color.black;
-
-            graph.Edges.ForEach(e =>
-            {
-                var from = e.From;
-                var to = e.To;
-                Gizmos.DrawLine(from.Position, to.Position);
-
-                #if UNITY_EDITOR
-                var distance = Vector3.Distance(Camera.main.transform.position, transform.TransformPoint(from.Position));
-                style.fontSize = Mathf.FloorToInt(Mathf.Lerp(20, 8, distance * 0.075f));
-                Handles.Label((from.Position + to.Position) * 0.5f, e.Weight.ToString("0.00"), style);
-                #endif
-            });
-
-            Gizmos.color = Color.green;
-
-            var nodes = path.Traverse(graph, destination);
-            for(int i = 0, n = nodes.Count - 1; i < n; i++)
-            {
-                var from = nodes[i];
-                var to = nodes[i + 1];
-                Gizmos.DrawLine(from.Position, to.Position); }
-
         }
 
     }

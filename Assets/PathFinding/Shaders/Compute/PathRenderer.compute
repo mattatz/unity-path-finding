@@ -1,0 +1,154 @@
+﻿#define THREAD [numthreads(8, 8, 1)]
+
+#pragma kernel Initialize
+#pragma kernel Sequence
+#pragma kernel Check
+#pragma kernel ViewAlign
+
+#include "../Common/Segment.cginc"
+#include "../Common/Random.cginc"
+
+StructuredBuffer<float3> _Path;
+RWStructuredBuffer<Segment> _Segments;
+RWStructuredBuffer<float3> _Vertices;
+
+int _PathCount, _SegmentsCount, _InstancesCount;
+
+float _DT;
+float _Longest;
+
+float _Thickness;
+float3 _LocalCameraDirection;
+
+void Init(inout Segment segment, int iid) {
+	int ioff = iid * _PathCount;
+	float3 start = _Path[ioff];
+	segment.position.xyz = start.xyz;
+	segment.t = 0;
+
+	float d = 0;
+	for (int i = 0; i < _PathCount - 1; i++) {
+		float3 from = _Path[ioff + i].xyz;
+		float3 to = _Path[ioff + i + 1].xyz;
+		d = distance(from, to);
+	}
+
+	segment.ratio = saturate(d / _Longest);
+	float r = nrand(iid.xx);
+	segment.speed = lerp(0.1, 1.0, 1.0 - segment.ratio) + r * 0.1;
+}
+
+THREAD
+void Initialize (uint3 id : SV_DispatchThreadID) {
+	int idx = (int)id.x;
+	int iid = (int)id.y;
+	if (idx >= _SegmentsCount || iid >= _InstancesCount) return;
+
+	int sid = iid * _SegmentsCount + idx;
+	Segment segment = _Segments[sid];
+	Init(segment, iid);
+	_Segments[sid] = segment;
+}
+
+float3 GetPosition(float t, int iid) {
+	int ioff = iid * _PathCount;
+	float p = t * (_PathCount - 1);
+	int pid = floor(p);
+	int nid = ceil(p);
+	float3 pp = _Path[ioff + pid];
+	float3 np = _Path[ioff + nid];
+	return lerp(pp, np, saturate(p - pid));
+}
+
+THREAD
+void Sequence (uint3 id : SV_DispatchThreadID) {
+	int idx = (int)id.x;
+	int iid = (int)id.y;
+	if (idx >= _SegmentsCount || iid >= _InstancesCount) return;
+
+	int ipoff = iid * _PathCount;
+	int sid = iid * _SegmentsCount + idx;
+	Segment segment = _Segments[sid];
+
+	if (idx == 0) {
+		// head
+		segment.t = saturate(segment.t + _DT * segment.speed);
+		segment.position.xyz = GetPosition(segment.t, iid);
+	} else {
+		Segment next = _Segments[sid - 1];
+		/*
+		Segment head = _Segments[iid * _SegmentsCount];
+		float3 dir = segment.position - next.position;
+		float m = length(dir);
+		if (m > 0.0) {
+			segment.position.xyz = next.position.xyz + normalize(dir) * clamp(m, 0.01, 0.1);
+		}
+		segment.position.xyz = lerp(segment.position.xyz, _Path[ipoff].xyz, step(head.t, 0));
+		*/
+		float d = next.t - segment.t;
+		segment.t = saturate(segment.t + clamp(d, 0.0, 0.1));
+		segment.position.xyz = GetPosition(segment.t, iid);
+	}
+
+	_Segments[sid] = segment;
+}
+
+[numthreads(8, 1, 1)]
+void Check (uint3 id : SV_DispatchThreadID) {
+	int iid = (int)id.x;
+	if (iid >= _InstancesCount) return;
+
+	bool finish = false;
+	int ioff = iid * _SegmentsCount;
+	for (int i = 0; i < _SegmentsCount; i++) {
+		Segment s = _Segments[ioff + i];
+		finish = finish || (s.t >= 1.0);
+	}
+
+	if (finish) {
+		for (int i = 0; i < _SegmentsCount; i++) {
+			Segment s = _Segments[ioff + i];
+			Init(s, iid);
+			_Segments[ioff + i] = s;
+		}
+	}
+
+}
+
+THREAD
+void ViewAlign (uint3 id : SV_DispatchThreadID)
+{
+	int idx = (int)id.x;
+	int iid = (int)id.y;
+	if (idx >= _SegmentsCount || iid >= _InstancesCount) return;
+
+	int iseg = idx + _SegmentsCount * iid;
+	float3 cur = _Segments[iseg].position.xyz;
+	float3 right = float3(0, 0, 0);
+
+	if (idx == 0) {
+		// head
+		float3 prev = _Segments[iseg + 1].position.xyz;
+		float3 dir = normalize(cur - prev);
+		right = normalize(cross(dir, _LocalCameraDirection)) * 0.5 * _Thickness;
+	} else if (idx == _SegmentsCount - 1) {
+		// tail
+		float3 next = _Segments[iseg - 1].position.xyz;
+		float3 dir = normalize(next - cur);
+		right = normalize(cross(dir, _LocalCameraDirection)) * 0.5 * _Thickness;
+	} else {
+		// middle
+		float3 prev = _Segments[iseg + 1].position.xyz;
+		float3 next = _Segments[iseg - 1].position.xyz;
+		float3 dir10 = normalize(cur - prev);
+		float3 dir21 = normalize(next - cur);
+		float3 dir = ((dir10 + dir21) * 0.5f);
+		float d = saturate((dot(dir10, dir21) + 1.0) * 0.5);
+		right = normalize(cross(dir, _LocalCameraDirection)) * lerp(1, 0.5, d) * _Thickness;
+	}
+
+	int ioffset = (_SegmentsCount * 2) * iid;
+	_Vertices[ioffset + idx * 2] = cur - right;
+	_Vertices[ioffset + idx * 2 + 1] = cur + right;
+}
+

@@ -3,6 +3,8 @@ unity-path-finding
 
 ![Demo](https://raw.githubusercontent.com/mattatz/unity-path-finding/master/Captures/Demo.gif)
 
+![PathRenderer](https://raw.githubusercontent.com/mattatz/unity-path-finding/master/Captures/PathRenderer.gif)
+
 Shortest path finding with Dijkstra's algorithm for Unity.
 
 ## Usage (2D grid nodes example)
@@ -20,7 +22,7 @@ for(int y = 0; y < height; y++)
 {
     for(int x = 0; x < width; x++)
     {
-        var node = new Node3D(new Vector3(x, 0, y));
+        var node = new Node(new Vector3(x, 0, y));
         nodes.Add(node);
     }
 }
@@ -38,7 +40,7 @@ for(int y = 0; y < height; y++)
         if(x < width - 1)
         {
             var to = nodes[idx + 1];
-            var e = node.Connect(to, Vector3.Distance((node as Node3D).Position, (to as Node3D).Position));
+            var e = node.Connect(to, Vector3.Distance(node.Position, to.Position));
             edges.Add(e);
         }
 
@@ -46,7 +48,7 @@ for(int y = 0; y < height; y++)
         if(y < height - 1)
         {
             var to = nodes[idx + width];
-            var e = node.Connect(to, Vector3.Distance((node as Node3D).Position, (to as Node3D).Position));
+            var e = node.Connect(to, Vector3.Distance(node.Position, to.Position));
             edges.Add(e);
         }
     }
@@ -55,9 +57,9 @@ for(int y = 0; y < height; y++)
 // create graph
 var graph = new Graph(nodes, edges);
 
-// build a Route with shortest path finding from source
+// build a Path with shortest path finding from source
 int source = 0; // source node index
-Route route = graph.Find(source);
+Path route = graph.Find(source);
 
 // traverse a route from source to destination
 int destination = 84; // destination node index
@@ -70,10 +72,12 @@ for(int i = 0, n = nodes.Count - 1; i < n; i++)
     var to = nodes[i + 1];
 
     // draw line between from and to nodes
-    Gizmos.DrawLine((from as Node3D).Position, (to as Node3D).Position);
+    Gizmos.DrawLine(from.Position, to.Position);
 }
 
 ```
+
+## PathRenderer
 
 ## Sources
 

@@ -21,7 +21,7 @@ namespace PathFinding
 
         // https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm
         // Shortest path finding with Dijkstra's algorithm
-        public Route Find(int source)
+        public Path Find(int source)
         {
             var queue = new PriorityQueue<float, Node>();
 
@@ -51,13 +51,24 @@ namespace PathFinding
                 });
             }
 
-            return new Route(nodes, source);
+            return new Path(nodes, source);
         }
 
-        public Route Find(Node node)
+        public Path Find(Node node)
         {
             var index = nodes.IndexOf(node);
             return Find(index);
+        }
+
+        // enumerate all routes from all nodes
+        // it may take too long time
+        public List<Path> Permutation ()
+        {
+            var routes = new List<Path>();
+            for(int i = 0, n = nodes.Count; i < n; i++) {
+                routes.Add(Find(i));
+            }
+            return routes;
         }
 
     }

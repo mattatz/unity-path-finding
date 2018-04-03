@@ -9,14 +9,14 @@ using UnityEngine;
 namespace PathFinding
 {
 
-    public class Route {
+    public class Path {
 
         public static readonly int SOURCE = -1;
 
         protected List<int> indices;
         protected int source;
 
-        public Route(List<Node> nodes, int source)
+        public Path(List<Node> nodes, int source)
         {
             indices = new List<int>();
             for(int i = 0, n = nodes.Count; i < n; i++)
