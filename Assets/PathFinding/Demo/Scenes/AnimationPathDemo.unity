@@ -245,10 +245,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   width: 15
-  height: 15
+  height: 5
+  depth: 15
   source: 0
   length: 30
-  count: 225
+  count: 1125
   nodeRenderer: {fileID: 612599905}
   pathRenderer: {fileID: 608050942}
 --- !u!1 &1629607584
