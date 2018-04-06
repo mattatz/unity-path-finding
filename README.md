@@ -65,7 +65,10 @@ Path route = graph.Find(source);
 int destination = 84; // destination node index
 
 // traverse nodes from destination to source
-List<Node> nodes = route.Traverse(graph, destination);
+List<Node> nodes;
+
+// Traverse function returns if traversable or not
+bool traversable = nodes = route.Traverse(graph, destination, out nodes);
 for(int i = 0, n = nodes.Count - 1; i < n; i++)
 {
     var from = nodes[i];

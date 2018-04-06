@@ -118,7 +118,8 @@ namespace PathFinding.Demo
 
             Gizmos.color = Color.green;
 
-            var nodes = path.Traverse(graph, destination);
+            List<Node> nodes;
+            path.Traverse(graph, destination, out nodes);
             for(int i = 0, n = nodes.Count - 1; i < n; i++)
             {
                 var from = nodes[i];

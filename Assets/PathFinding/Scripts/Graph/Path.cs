@@ -18,6 +18,8 @@ namespace PathFinding
 
         public Path(List<Node> nodes, int source)
         {
+            this.source = source;
+
             indices = new List<int>();
             for(int i = 0, n = nodes.Count; i < n; i++)
             {
@@ -27,6 +29,9 @@ namespace PathFinding
                 } else
                 {
                     var node = nodes[i];
+
+                    // if node.prev is null,
+                    // nodes.IndexOf returns -1
                     indices.Add(nodes.IndexOf(node.prev));
                 }
             }
@@ -37,22 +42,34 @@ namespace PathFinding
             return indices[index];
         }
 
-        public List<int> Traverse(int destination)
+        public bool Traverse(int destination, out List<int> indices)
         {
-            var path = new List<int>();
+            indices = new List<int>();
             while(destination != source) {
-                path.Add(destination);
+                indices.Add(destination);
                 destination = Prev(destination);
+                if (destination < 0)
+                {
+                    return false;
+                }
             }
-            return path;
+            return true;
         }
 
-        public List<Node> Traverse(Graph graph, int destination)
+        public bool Traverse(Graph graph, int destination, out List<Node> nodes)
         {
-            var path = Traverse(destination);
-            var nodes = path.Select(i => graph.Nodes[i]).ToList();
+            nodes = new List<Node>();
+
+            List<int> indices;
+            var result = Traverse(destination, out indices);
+            if (!result)
+            {
+                return false;
+            }
+
+            nodes = indices.Select(i => graph.Nodes[i]).ToList();
             nodes.Add(graph.Nodes[source]);
-            return nodes;
+            return true;
         }
 
         public string BuildRow()

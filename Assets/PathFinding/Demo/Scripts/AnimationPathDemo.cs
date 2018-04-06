@@ -90,8 +90,9 @@ namespace PathFinding.Demo
             for(int i = 0; i < count; i++)
             {
                 var idx = (source + (i + 1)) % graph.Nodes.Count;
-                var route = path.Traverse(graph, idx);
-                if(route.Count > 10)
+                List<Node> route;
+                var result = path.Traverse(graph, idx, out route);
+                if(result && route.Count > 10)
                 {
                     route.Reverse();
                     var points = route.Select(n => n.Position).ToList();
