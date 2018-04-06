@@ -22,6 +22,7 @@ namespace PathFinding
 
         protected Mesh mesh;
         protected int pathCount = 0, instancesCount = 0;
+        protected float longest;
         protected ComputeBuffer pathBuffer, segmentBuffer, vertexBuffer;
         protected ComputeBuffer argsBuffer;
         uint[] args = new uint[5] { 0, 0, 0, 0, 0 };
@@ -80,18 +81,26 @@ namespace PathFinding
             argsBuffer = new ComputeBuffer(1, args.Length * sizeof(uint), ComputeBufferType.IndirectArguments);
             argsBuffer.SetData(args);
 
-            compute.SetFloat("_Longest", bundle.Longest);
+            longest = bundle.Longest;
 
             Initialize();
+        }
+        
+        protected void SetupProps()
+        {
+            compute.SetInt("_PathCount", pathCount);
+            compute.SetInt("_SegmentsCount", segmentsCount);
+            compute.SetInt("_InstancesCount", instancesCount);
+            compute.SetFloat("_InvSegmentsCount", 1f / segmentsCount);
+            compute.SetFloat("_Longest", longest);
         }
 
         protected void Initialize ()
         {
+            SetupProps();
+
             var kernel = compute.FindKernel("Initialize");
             compute.SetBuffer(kernel, "_Segments", segmentBuffer);
-            compute.SetInt("_PathCount", pathCount);
-            compute.SetInt("_SegmentsCount", segmentsCount);
-            compute.SetInt("_InstancesCount", instancesCount);
 
             uint tx, ty, tz;
             compute.GetKernelThreadGroupSizes(kernel, out tx, out ty, out tz);
@@ -101,28 +110,32 @@ namespace PathFinding
 
         protected void Sequence (float dt)
         {
-            var kernel = compute.FindKernel("Sequence");
-            compute.SetBuffer(kernel, "_Path", pathBuffer);
-            compute.SetBuffer(kernel, "_Segments", segmentBuffer);
-            compute.SetInt("_PathCount", pathCount);
-            compute.SetInt("_SegmentsCount", segmentsCount);
-            compute.SetInt("_InstancesCount", instancesCount);
+            SetupProps();
             compute.SetFloat("_DT", dt);
 
+            int kernel;
             uint tx, ty, tz;
-            compute.GetKernelThreadGroupSizes(kernel, out tx, out ty, out tz);
 
+            kernel = compute.FindKernel("Head");
+            compute.SetBuffer(kernel, "_Path", pathBuffer);
+            compute.SetBuffer(kernel, "_Segments", segmentBuffer);
+            compute.GetKernelThreadGroupSizes(kernel, out tx, out ty, out tz);
+            compute.Dispatch(kernel, instancesCount / (int)tx + 1, (int)ty, (int)tz);
+
+            kernel = compute.FindKernel("Sequence");
+            compute.SetBuffer(kernel, "_Path", pathBuffer);
+            compute.SetBuffer(kernel, "_Segments", segmentBuffer);
+            compute.GetKernelThreadGroupSizes(kernel, out tx, out ty, out tz);
             compute.Dispatch(kernel, segmentsCount / (int)tx + 1, instancesCount / (int)ty + 1, (int)tz);
         }
 
         protected void Check ()
         {
+            SetupProps();
+
             var kernel = compute.FindKernel("Check");
             compute.SetBuffer(kernel, "_Path", pathBuffer);
             compute.SetBuffer(kernel, "_Segments", segmentBuffer);
-            compute.SetInt("_PathCount", pathCount);
-            compute.SetInt("_SegmentsCount", segmentsCount);
-            compute.SetInt("_InstancesCount", instancesCount);
 
             uint tx, ty, tz;
             compute.GetKernelThreadGroupSizes(kernel, out tx, out ty, out tz);
@@ -132,11 +145,11 @@ namespace PathFinding
 
         protected void ViewAlign()
         {
+            SetupProps();
+
             var kernel = compute.FindKernel("ViewAlign");
             compute.SetBuffer(kernel, "_Segments", segmentBuffer);
             compute.SetBuffer(kernel, "_Vertices", vertexBuffer);
-            compute.SetInt("_SegmentsCount", segmentsCount);
-            compute.SetInt("_InstancesCount", instancesCount);
             compute.SetFloat("_Thickness", thickness);
 
             var localCamDir = transform.InverseTransformDirection(Camera.main.transform.forward);

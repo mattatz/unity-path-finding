@@ -1,6 +1,7 @@
 ﻿#define THREAD [numthreads(8, 8, 1)]
 
 #pragma kernel Initialize
+#pragma kernel Head
 #pragma kernel Sequence
 #pragma kernel Check
 #pragma kernel ViewAlign
@@ -13,6 +14,7 @@ RWStructuredBuffer<Segment> _Segments;
 RWStructuredBuffer<float3> _Vertices;
 
 int _PathCount, _SegmentsCount, _InstancesCount;
+float _InvSegmentsCount;
 
 float _DT;
 float _Longest;
@@ -60,6 +62,21 @@ float3 GetPosition(float t, int iid) {
 	return lerp(pp, np, saturate(p - pid));
 }
 
+[numthreads(8, 1, 1)]
+void Head(uint3 id : SV_DispatchThreadID) {
+	int iid = (int)id.x;
+	if (iid >= _InstancesCount) return;
+
+	int sid = iid * _SegmentsCount;
+	Segment segment = _Segments[sid];
+
+	// head
+	segment.t = saturate(segment.t + _DT * segment.speed);
+	segment.position.xyz = GetPosition(segment.t, iid);
+
+	_Segments[sid] = segment;
+}
+
 THREAD
 void Sequence (uint3 id : SV_DispatchThreadID) {
 	int idx = (int)id.x;
@@ -72,8 +89,6 @@ void Sequence (uint3 id : SV_DispatchThreadID) {
 
 	if (idx == 0) {
 		// head
-		segment.t = saturate(segment.t + _DT * segment.speed);
-		segment.position.xyz = GetPosition(segment.t, iid);
 	} else {
 		Segment next = _Segments[sid - 1];
 		/*
@@ -86,7 +101,7 @@ void Sequence (uint3 id : SV_DispatchThreadID) {
 		segment.position.xyz = lerp(segment.position.xyz, _Path[ipoff].xyz, step(head.t, 0));
 		*/
 		float d = next.t - segment.t;
-		segment.t = saturate(segment.t + clamp(d, 0.0, 0.1));
+		segment.t = saturate(segment.t + clamp(d, 0.0, _InvSegmentsCount));
 		segment.position.xyz = GetPosition(segment.t, iid);
 	}
 
