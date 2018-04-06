@@ -71,7 +71,7 @@
 				UNITY_SETUP_INSTANCE_ID(v);
 				UNITY_TRANSFER_INSTANCE_ID(v, o);
 
-				uint ioffset = 20 * iid;
+				uint ioffset = _VertexCount * iid;
 				o.vertex = UnityObjectToClipPos(float4(_Vertices[v.vid + ioffset].xyz, 1));
 				o.uv = v.uv;
 				return o;

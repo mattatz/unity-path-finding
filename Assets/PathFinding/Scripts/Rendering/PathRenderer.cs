@@ -14,7 +14,7 @@ namespace PathFinding
         [SerializeField] protected ComputeShader compute;
         [SerializeField] protected int segmentsCount = 20;
         [SerializeField] protected float thickness = 0.25f;
-        [SerializeField] protected float speed = 1f;
+        [SerializeField, Range(0.1f, 1f)] protected float speed = 1f;
 
         [SerializeField] protected Graph graph;
 
@@ -35,7 +35,7 @@ namespace PathFinding
         protected void Update () {
             if (instancesCount <= 0) return;
 
-            Sequence(Time.deltaTime * speed);
+            Sequence(Time.deltaTime);
             ViewAlign();
             Check();
 
@@ -72,7 +72,7 @@ namespace PathFinding
             segmentBuffer = new ComputeBuffer(instancesCount * segmentsCount, Marshal.SizeOf(typeof(Segment_t)));
             segmentBuffer.SetData(new Segment_t[segmentBuffer.count]);
 
-            vertexBuffer = new ComputeBuffer(segmentBuffer.count * 2, Marshal.SizeOf(typeof(Vector3)));
+            vertexBuffer = new ComputeBuffer(instancesCount * segmentsCount * 2, Marshal.SizeOf(typeof(Vector3)));
             vertexBuffer.SetData(new Vector3[vertexBuffer.count]);
 
             mesh = Build(segmentsCount);
@@ -93,6 +93,7 @@ namespace PathFinding
             compute.SetInt("_InstancesCount", instancesCount);
             compute.SetFloat("_InvSegmentsCount", 1f / segmentsCount);
             compute.SetFloat("_Longest", longest);
+            compute.SetFloat("_Speed", speed);
         }
 
         protected void Initialize ()
@@ -104,7 +105,6 @@ namespace PathFinding
 
             uint tx, ty, tz;
             compute.GetKernelThreadGroupSizes(kernel, out tx, out ty, out tz);
-
             compute.Dispatch(kernel, segmentsCount / (int)tx + 1, instancesCount / (int)ty + 1, (int)tz);
         }
 
@@ -126,7 +126,8 @@ namespace PathFinding
             compute.SetBuffer(kernel, "_Path", pathBuffer);
             compute.SetBuffer(kernel, "_Segments", segmentBuffer);
             compute.GetKernelThreadGroupSizes(kernel, out tx, out ty, out tz);
-            compute.Dispatch(kernel, segmentsCount / (int)tx + 1, instancesCount / (int)ty + 1, (int)tz);
+            // compute.Dispatch(kernel, segmentsCount / (int)tx + 1, instancesCount / (int)ty + 1, (int)tz);
+            compute.Dispatch(kernel, instancesCount / (int)tx + 1, (int)ty, (int)tz);
         }
 
         protected void Check ()
@@ -139,7 +140,6 @@ namespace PathFinding
 
             uint tx, ty, tz;
             compute.GetKernelThreadGroupSizes(kernel, out tx, out ty, out tz);
-
             compute.Dispatch(kernel, instancesCount / (int)tx + 1, (int)ty, (int)tz);
         }
 
@@ -163,16 +163,16 @@ namespace PathFinding
 
         #region static functions
 
-        public static Mesh Build(int count)
+        public static Mesh Build(int pathCount)
         {
             var mesh = new Mesh();
 
-            var vertices = new Vector3[count * 2];
-            var uv = new Vector2[count * 2];
+            var vertices = new Vector3[pathCount * 2];
+            var uv = new Vector2[pathCount * 2];
             var indices = new List<int>();
 
-            float inv = 1f / (count - 1);
-            for(int i = 0; i < count; i++)
+            float inv = 1f / (pathCount - 1);
+            for(int i = 0; i < pathCount; i++)
             {
                 var idx = i * 2;
 
@@ -182,7 +182,7 @@ namespace PathFinding
                 uv[idx] = new Vector2(0f, inv * i);
                 uv[idx + 1] = new Vector2(1f, inv * i);
 
-                if(i < count - 1)
+                if(i < pathCount - 1)
                 {
                     indices.Add(idx); indices.Add(idx + 1); indices.Add(idx + 2);
                     indices.Add(idx + 3); indices.Add(idx + 2); indices.Add(idx + 1);

@@ -16,18 +16,27 @@ RWStructuredBuffer<float3> _Vertices;
 int _PathCount, _SegmentsCount, _InstancesCount;
 float _InvSegmentsCount;
 
-float _DT;
+float _DT, _Speed;
 float _Longest;
 
 float _Thickness;
 float3 _LocalCameraDirection;
 
-void Init(inout Segment segment, int iid) {
+float3 GetPosition(float t, int iid) {
 	int ioff = iid * _PathCount;
-	float3 start = _Path[ioff];
-	segment.position.xyz = start.xyz;
+	float p = saturate(t) * (_PathCount - 1);
+	int pid = floor(p);
+	int nid = ceil(p);
+	float3 pp = _Path[ioff + pid];
+	float3 np = _Path[ioff + nid];
+	return lerp(pp, np, saturate(p - pid));
+}
+
+void Init(inout Segment segment, int iid) {
+	segment.position.xyz = GetPosition(0, iid);
 	segment.t = 0;
 
+	int ioff = iid * _PathCount;
 	float d = 0;
 	for (int i = 0; i < _PathCount - 1; i++) {
 		float3 from = _Path[ioff + i].xyz;
@@ -52,60 +61,40 @@ void Initialize (uint3 id : SV_DispatchThreadID) {
 	_Segments[sid] = segment;
 }
 
-float3 GetPosition(float t, int iid) {
-	int ioff = iid * _PathCount;
-	float p = t * (_PathCount - 1);
-	int pid = floor(p);
-	int nid = ceil(p);
-	float3 pp = _Path[ioff + pid];
-	float3 np = _Path[ioff + nid];
-	return lerp(pp, np, saturate(p - pid));
-}
-
-[numthreads(8, 1, 1)]
-void Head(uint3 id : SV_DispatchThreadID) {
+[numthreads (8, 1, 1)]
+void Head (uint3 id : SV_DispatchThreadID) {
 	int iid = (int)id.x;
 	if (iid >= _InstancesCount) return;
 
-	int sid = iid * _SegmentsCount;
-	Segment segment = _Segments[sid];
+	int ioff = iid * _SegmentsCount;
+	Segment segment = _Segments[ioff];
 
 	// head
-	segment.t = saturate(segment.t + _DT * segment.speed);
+	segment.t = saturate(segment.t + _DT * _Speed * segment.speed);
 	segment.position.xyz = GetPosition(segment.t, iid);
 
-	_Segments[sid] = segment;
+	_Segments[ioff] = segment;
 }
 
-THREAD
+[numthreads(8, 1, 1)]
 void Sequence (uint3 id : SV_DispatchThreadID) {
-	int idx = (int)id.x;
-	int iid = (int)id.y;
-	if (idx >= _SegmentsCount || iid >= _InstancesCount) return;
+	int iid = (int)id.x;
+	if (iid >= _InstancesCount) return;
 
-	int ipoff = iid * _PathCount;
-	int sid = iid * _SegmentsCount + idx;
-	Segment segment = _Segments[sid];
+	int ioff = iid * _SegmentsCount;
 
-	if (idx == 0) {
-		// head
-	} else {
+	Segment head = _Segments[ioff];
+	for (int idx = 1; idx < _SegmentsCount; idx++) {
+		int sid = ioff + idx;
 		Segment next = _Segments[sid - 1];
-		/*
-		Segment head = _Segments[iid * _SegmentsCount];
-		float3 dir = segment.position - next.position;
-		float m = length(dir);
-		if (m > 0.0) {
-			segment.position.xyz = next.position.xyz + normalize(dir) * clamp(m, 0.01, 0.1);
-		}
-		segment.position.xyz = lerp(segment.position.xyz, _Path[ipoff].xyz, step(head.t, 0));
-		*/
-		float d = next.t - segment.t;
-		segment.t = saturate(segment.t + clamp(d, 0.0, _InvSegmentsCount));
-		segment.position.xyz = GetPosition(segment.t, iid);
-	}
+		Segment current = _Segments[sid];
 
-	_Segments[sid] = segment;
+		float d = (next.t - current.t) * _Speed;
+		current.t = max(next.t - _InvSegmentsCount, saturate(current.t + d));
+
+		current.position.xyz = GetPosition(current.t, iid);
+		_Segments[sid] = current;
+	}
 }
 
 [numthreads(8, 1, 1)]
@@ -113,19 +102,21 @@ void Check (uint3 id : SV_DispatchThreadID) {
 	int iid = (int)id.x;
 	if (iid >= _InstancesCount) return;
 
-	bool finish = false;
+	bool finish = true;
 	int ioff = iid * _SegmentsCount;
-	for (int i = 0; i < _SegmentsCount; i++) {
+
+	int i;
+	for (i = 0; i < _SegmentsCount; i++) {
 		Segment s = _Segments[ioff + i];
-		finish = finish || (s.t >= 1.0);
+		finish = finish && (s.t >= 0.9999);
 	}
 
-	if (finish) {
-		for (int i = 0; i < _SegmentsCount; i++) {
-			Segment s = _Segments[ioff + i];
-			Init(s, iid);
-			_Segments[ioff + i] = s;
-		}
+	if (!finish) return;
+
+	for (i = 0; i < _SegmentsCount; i++) {
+		Segment s = _Segments[ioff + i];
+		Init(s, iid);
+		_Segments[ioff + i] = s;
 	}
 
 }
@@ -162,8 +153,8 @@ void ViewAlign (uint3 id : SV_DispatchThreadID)
 		right = normalize(cross(dir, _LocalCameraDirection)) * lerp(1, 0.5, d) * _Thickness;
 	}
 
-	int ioffset = (_SegmentsCount * 2) * iid;
-	_Vertices[ioffset + idx * 2] = cur - right;
-	_Vertices[ioffset + idx * 2 + 1] = cur + right;
+	int voffset = (_SegmentsCount * 2) * iid;
+	_Vertices[voffset + idx * 2] = cur - right;
+	_Vertices[voffset + idx * 2 + 1] = cur + right;
 }
 
