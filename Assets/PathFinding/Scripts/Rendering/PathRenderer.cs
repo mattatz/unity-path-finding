@@ -101,11 +101,12 @@ namespace PathFinding
             SetupProps();
 
             var kernel = compute.FindKernel("Initialize");
+            compute.SetBuffer(kernel, "_Path", pathBuffer);
             compute.SetBuffer(kernel, "_Segments", segmentBuffer);
 
             uint tx, ty, tz;
             compute.GetKernelThreadGroupSizes(kernel, out tx, out ty, out tz);
-            compute.Dispatch(kernel, segmentsCount / (int)tx + 1, instancesCount / (int)ty + 1, (int)tz);
+            compute.Dispatch(kernel, instancesCount / (int)tx + 1, (int)ty, (int)tz);
         }
 
         protected void Sequence (float dt)

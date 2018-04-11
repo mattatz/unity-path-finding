@@ -1,4 +1,5 @@
-﻿#define THREAD [numthreads(8, 8, 1)]
+﻿#define THREAD_1D [numthreads(8, 1, 1)]
+#define THREAD_2D [numthreads(8, 8, 1)]
 
 #pragma kernel Initialize
 #pragma kernel Head
@@ -41,7 +42,7 @@ void Init(inout Segment segment, int iid) {
 	for (int i = 0; i < _PathCount - 1; i++) {
 		float3 from = _Path[ioff + i].xyz;
 		float3 to = _Path[ioff + i + 1].xyz;
-		d = distance(from, to);
+		d += distance(from, to);
 	}
 
 	segment.ratio = saturate(d / _Longest);
@@ -49,19 +50,31 @@ void Init(inout Segment segment, int iid) {
 	segment.speed = lerp(0.1, 1.0, 1.0 - segment.ratio) + r * 0.1;
 }
 
-THREAD
+THREAD_1D
 void Initialize (uint3 id : SV_DispatchThreadID) {
-	int idx = (int)id.x;
-	int iid = (int)id.y;
-	if (idx >= _SegmentsCount || iid >= _InstancesCount) return;
+	int iid = (int)id.x;
+	if (iid >= _InstancesCount) return;
 
-	int sid = iid * _SegmentsCount + idx;
-	Segment segment = _Segments[sid];
-	Init(segment, iid);
-	_Segments[sid] = segment;
+	int ioff = iid * _SegmentsCount;
+	Segment head = _Segments[ioff];
+	Init(head, iid);
+
+    float r = nrand(iid.xx);
+    head.t = r;
+    _Segments[ioff] = head;
+
+	Segment next = head;
+	for (int idx = 1; idx < _SegmentsCount; idx++) {
+		int sid = ioff + idx;
+		Segment current = _Segments[sid];
+        Init(current, iid);
+        current.t = head.t;
+		_Segments[sid] = current;
+        next = current;
+    }
 }
 
-[numthreads (8, 1, 1)]
+THREAD_1D
 void Head (uint3 id : SV_DispatchThreadID) {
 	int iid = (int)id.x;
 	if (iid >= _InstancesCount) return;
@@ -76,28 +89,31 @@ void Head (uint3 id : SV_DispatchThreadID) {
 	_Segments[ioff] = segment;
 }
 
-[numthreads(8, 1, 1)]
+THREAD_1D
 void Sequence (uint3 id : SV_DispatchThreadID) {
 	int iid = (int)id.x;
 	if (iid >= _InstancesCount) return;
 
 	int ioff = iid * _SegmentsCount;
-
+	
 	Segment head = _Segments[ioff];
+    float len = lerp(1.0, 0.0001, head.ratio) * _InvSegmentsCount;
+    float speed = saturate(_Speed * lerp(0.5, 1.0, head.ratio)) * saturate(_DT * 30.0);
+
 	for (int idx = 1; idx < _SegmentsCount; idx++) {
 		int sid = ioff + idx;
 		Segment next = _Segments[sid - 1];
 		Segment current = _Segments[sid];
 
-		float d = (next.t - current.t) * _Speed;
-		current.t = max(next.t - _InvSegmentsCount, saturate(current.t + d));
+		float d = (next.t - current.t) * speed;
+		current.t = max(next.t - len, saturate(current.t + d));
 
 		current.position.xyz = GetPosition(current.t, iid);
 		_Segments[sid] = current;
 	}
 }
 
-[numthreads(8, 1, 1)]
+THREAD_1D
 void Check (uint3 id : SV_DispatchThreadID) {
 	int iid = (int)id.x;
 	if (iid >= _InstancesCount) return;
@@ -121,7 +137,7 @@ void Check (uint3 id : SV_DispatchThreadID) {
 
 }
 
-THREAD
+THREAD_2D
 void ViewAlign (uint3 id : SV_DispatchThreadID)
 {
 	int idx = (int)id.x;
