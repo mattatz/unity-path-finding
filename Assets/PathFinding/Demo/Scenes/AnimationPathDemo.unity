@@ -157,7 +157,7 @@ MonoBehaviour:
   compute: {fileID: 7200000, guid: eb01351b631b46740924a1db458a70c4, type: 3}
   segmentsCount: 16
   thickness: 0.1
-  speed: 0.5
+  speed: 1
   srcBlend: 5
   dstBlend: 1
 --- !u!1 &612599903

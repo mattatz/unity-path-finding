@@ -61,6 +61,7 @@ void Initialize (uint3 id : SV_DispatchThreadID) {
 
     float r = nrand(iid.xx);
     head.t = r;
+	head.position.xyz = GetPosition(head.t, iid);
     _Segments[ioff] = head;
 
 	Segment next = head;
@@ -69,6 +70,7 @@ void Initialize (uint3 id : SV_DispatchThreadID) {
 		Segment current = _Segments[sid];
         Init(current, iid);
         current.t = head.t;
+        current.position.xyz = head.position.xyz;
 		_Segments[sid] = current;
         next = current;
     }
@@ -80,13 +82,13 @@ void Head (uint3 id : SV_DispatchThreadID) {
 	if (iid >= _InstancesCount) return;
 
 	int ioff = iid * _SegmentsCount;
-	Segment segment = _Segments[ioff];
+	Segment head = _Segments[ioff];
 
 	// head
-	segment.t = saturate(segment.t + _DT * _Speed * segment.speed);
-	segment.position.xyz = GetPosition(segment.t, iid);
+	head.t = saturate(head.t + _DT * _Speed * head.speed);
+	head.position.xyz = GetPosition(head.t, iid);
 
-	_Segments[ioff] = segment;
+	_Segments[ioff] = head;
 }
 
 THREAD_1D
